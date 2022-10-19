@@ -1,7 +1,9 @@
 package document
 
 import (
+	"errors"
 	"math/rand"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -133,13 +135,15 @@ func TestDocumentSetInvalidType(t *testing.T) {
 
 func TestDocumentUnmarshal(t *testing.T) {
 	a := &struct {
-		MyStringField string
-	}{"ciao"}
+		MyStringField        string
+		MyCustomMarshalField url.URL
+	}{"ciao", url.URL{Scheme: "http", Host: "example.com"}}
 
 	doc := NewDocumentOf(a)
 
 	b := &struct {
-		MyStringField string
+		MyStringField        string
+		MyCustomMarshalField url.URL
 	}{}
 
 	require.NoError(t, doc.Unmarshal(b))
@@ -203,4 +207,58 @@ func TestDocumentFields(t *testing.T) {
 	require.Contains(t, keys, "f_3")
 	require.Equal(t, 5, len(keys))
 
+}
+
+type CustomID [16]byte
+
+func (cid CustomID) MarshalBinary() ([]byte, error) {
+	return cid[:], nil
+}
+
+func (cid *CustomID) UnarshalBinary(b []byte) error {
+	if len(b) != len(*cid) {
+		return errors.New("wrong length")
+	}
+	copy((*cid)[:], b)
+	return nil
+}
+
+func TestDocumentMarshalling(t *testing.T) {
+	type MyType struct {
+		ID   CustomID
+		Name string
+		Age  int
+		// Favs [3]int
+	}
+
+	var a = MyType{
+		ID:   CustomID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
+		Name: "My Name",
+		Age:  100,
+		// Favs: [3]int{25, 42, math.MaxInt},
+	}
+
+	t.Run("direct", func(t *testing.T) {
+		doc, err := NewDocumentFrom(a)
+		require.NoError(t, err)
+		require.NotNil(t, doc)
+
+		var b MyType
+		err = doc.Unmarshal(&b)
+		require.NoError(t, err)
+
+		require.Equal(t, a, b)
+	})
+
+	t.Run("pointer", func(t *testing.T) {
+		doc, err := NewDocumentFrom(&a)
+		require.NoError(t, err)
+		require.NotNil(t, doc)
+
+		var b MyType
+		err = doc.Unmarshal(&b)
+		require.NoError(t, err)
+
+		require.Equal(t, a, b)
+	})
 }

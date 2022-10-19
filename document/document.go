@@ -36,15 +36,25 @@ func NewDocument() *Document {
 // NewDocumentOf creates a new document and initializes it with the content of the provided object.
 // It returns nil if the object cannot be converted to a valid Document.
 func NewDocumentOf(o interface{}) *Document {
-	normalized, _ := internal.Normalize(o)
+	d, _ := NewDocumentFrom(o)
+	return d
+}
+
+// NewDocumentFrom creates a new document and initializes it with the content of the provided object.
+// It returns nil if the object cannot be converted to a valid Document.
+func NewDocumentFrom(o interface{}) (*Document, error) {
+	normalized, err := internal.Normalize(o)
+	if err != nil {
+		return nil, err
+	}
 	fields, _ := normalized.(map[string]interface{})
 	if fields == nil {
-		return nil
+		return nil, fmt.Errorf("value must be map-like (such as a struct)")
 	}
 
 	return &Document{
 		fields: fields,
-	}
+	}, nil
 }
 
 // Copy returns a shallow copy of the underlying document.
