@@ -1,7 +1,7 @@
 package internal
 
 import (
-	"encoding/json"
+	"encoding"
 	"fmt"
 	"reflect"
 	"strings"
@@ -128,17 +128,18 @@ func Normalize(value interface{}) (interface{}, error) {
 		return nil, nil
 	}
 
+	switch value := value.(type) {
+	case time.Time, Value:
+		return value, nil
+	case *time.Time:
+		return *value, nil
+	case encoding.BinaryMarshaler:
+		return value.MarshalBinary()
+	}
+
 	rValue, rType := getElemValueAndType(value)
 	if rType.Kind() == reflect.Ptr {
 		return nil, nil
-	}
-
-	if _, isTime := rValue.Interface().(time.Time); isTime {
-		return rValue.Interface(), nil
-	}
-
-	if _, isValue := rValue.Interface().(Value); isValue {
-		return rValue.Interface(), nil
 	}
 
 	switch rType.Kind() {
@@ -156,7 +157,7 @@ func Normalize(value interface{}) (interface{}, error) {
 		return rValue.String(), nil
 	case reflect.Bool:
 		return rValue.Bool(), nil
-	case reflect.Slice:
+	case reflect.Slice, reflect.Array:
 		return normalizeSlice(rValue)
 	}
 	return nil, fmt.Errorf("invalid dtype %s", rType.Name())
@@ -239,9 +240,9 @@ func Decode(data []byte, m *map[string]interface{}) error {
 func Convert(m map[string]interface{}, v interface{}) error {
 	renamed := renameMapKeys(m, v)
 
-	b, err := json.Marshal(renamed)
+	b, err := msgpack.Marshal(renamed)
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(b, v)
+	return msgpack.Unmarshal(b, v)
 }
