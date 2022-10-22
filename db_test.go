@@ -158,7 +158,7 @@ func TestSaveDocument(t *testing.T) {
 
 		savedDoc, err := db.FindFirst(q.NewQuery("myCollection"))
 		require.NoError(t, err)
-		require.Equal(t, savedDoc, doc)
+		require.Equal(t, savedDoc.AsMap(), doc.AsMap())
 
 		id := doc.ObjectId()
 		doc.Set("_id", id)
@@ -171,7 +171,7 @@ func TestSaveDocument(t *testing.T) {
 
 		docUpdated, err := db.FindById("myCollection", id)
 		require.NoError(t, err)
-		require.Equal(t, doc, docUpdated)
+		require.Equal(t, doc.AsMap(), docUpdated.AsMap())
 	})
 }
 
@@ -270,7 +270,7 @@ func TestUpdateCollection(t *testing.T) {
 			doc.Set("completed", false)
 			updatedDoc, err := db.FindFirst(q.NewQuery("todos").Where(q.Field("id").Eq(doc.Get("id"))))
 			require.NoError(t, err)
-			require.Equal(t, doc, updatedDoc)
+			require.Equal(t, doc.AsMap(), updatedDoc.AsMap())
 		}
 	})
 }
@@ -287,7 +287,7 @@ func TestUpdateById(t *testing.T) {
 		require.Error(t, c.ErrDocumentNotExist)
 
 		id := doc.ObjectId()
-		completed := doc.Get("completed").(bool)
+		completed, _ := doc.Get("completed").(bool)
 
 		err = db.UpdateById("todos", id, map[string]interface{}{"completed": !completed})
 		require.NoError(t, err)
@@ -322,7 +322,7 @@ func TestReplaceById(t *testing.T) {
 
 		doc, err = db.FindById("todos", id)
 		require.NoError(t, err)
-		require.Equal(t, doc, newDoc)
+		require.Equal(t, doc.AsMap(), newDoc.AsMap())
 	})
 }
 
@@ -624,7 +624,9 @@ func TestCompareUint64(t *testing.T) {
 		require.NoError(t, err)
 
 		for _, doc := range docs {
-			require.Greater(t, doc.Get("id"), uint64(4))
+			m := TodoModel{}
+			require.NoError(t, doc.Unmarshal(&m))
+``			require.Greater(t, m.Id, uint(4))
 		}
 	})
 }

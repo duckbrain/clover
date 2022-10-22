@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -261,4 +262,29 @@ func TestDocumentMarshalling(t *testing.T) {
 
 		require.Equal(t, a, b)
 	})
+}
+
+type TodoModel struct {
+	Title         string     `json:"title" clover:"title"`
+	Completed     bool       `json:"completed,omitempty" clover:"completed"`
+	Id            uint       `json:"id" clover:"id"`
+	UserId        int        `json:"userId" clover:"userId"`
+	CompletedDate *time.Time `json:"completed_date,omitempty" clover:"completed_date,omitempty"`
+	Notes         *string    `json:"notes,omitempty" clover:"notes,omitempty"`
+}
+
+func TestGet(t *testing.T) {
+	completedDate := time.Date(2022, 10, 22, 1, 0, 0, 0, time.UTC)
+	notes := "My Notes"
+	m := TodoModel{
+		Title:         "My title",
+		Completed:     true,
+		Id:            2345,
+		UserId:        -23,
+		CompletedDate: &completedDate,
+		Notes:         &notes,
+	}
+	doc, err := NewDocumentFrom(m)
+	require.NoError(t, err)
+	require.Equal(t, m.Id, doc.Get("id").(uint64))
 }

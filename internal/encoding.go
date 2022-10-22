@@ -6,8 +6,6 @@ import (
 	"reflect"
 	"strings"
 	"time"
-
-	"github.com/vmihailenco/msgpack/v5"
 )
 
 type Value struct {
@@ -161,88 +159,4 @@ func Normalize(value interface{}) (interface{}, error) {
 		return normalizeSlice(rValue)
 	}
 	return nil, fmt.Errorf("invalid dtype %s", rType.Name())
-}
-
-func createRenameMap(rv reflect.Value) map[string]string {
-	renameMap := make(map[string]string)
-	for i := 0; i < rv.NumField(); i++ {
-		fieldType := rv.Type().Field(i)
-
-		tagStr, found := fieldType.Tag.Lookup("clover")
-		if found {
-			name, _ := processStructTag(tagStr)
-			renameMap[name] = fieldType.Name
-		}
-	}
-	return renameMap
-}
-
-func rename(fields map[string]interface{}, v interface{}) map[string]interface{} {
-	rv := reflect.ValueOf(v)
-	if rv.Type().Kind() != reflect.Struct {
-		return nil
-	}
-
-	renameMap := createRenameMap(rv)
-	m := make(map[string]interface{})
-	for key, value := range fields {
-		renamedFieldName := renameMap[key]
-		if renamedFieldName != "" {
-			m[renamedFieldName] = value
-			delete(m, key)
-		} else {
-			m[key] = value
-		}
-	}
-	return m
-}
-
-func getElemType(rt reflect.Type) reflect.Type {
-	for rt.Kind() == reflect.Ptr {
-		rt = rt.Elem()
-	}
-	return rt
-}
-
-func renameMapKeys(m map[string]interface{}, v interface{}) map[string]interface{} {
-	rv, rt := getElemValueAndType(v)
-	if rt.Kind() != reflect.Struct {
-		return m
-	}
-
-	renamed := rename(m, rv.Interface())
-	for i := 0; i < rv.NumField(); i++ {
-		sf := rv.Type().Field(i)
-		fv := renamed[sf.Name]
-		ft := getElemType(sf.Type)
-
-		fMap, isMap := fv.(map[string]interface{})
-		if isMap && ft.Kind() == reflect.Struct {
-			converted := renameMapKeys(fMap, rv.Field(i).Interface())
-			renamed[sf.Name] = converted
-		}
-	}
-	return renamed
-}
-
-func Encode(v map[string]interface{}) ([]byte, error) {
-	return msgpack.Marshal(replaceTimes(v))
-}
-
-func Decode(data []byte, m *map[string]interface{}) error {
-	err := msgpack.Unmarshal(data, m)
-	if err == nil {
-		removeLocalizedTimes(*m)
-	}
-	return err
-}
-
-func Convert(m map[string]interface{}, v interface{}) error {
-	renamed := renameMapKeys(m, v)
-
-	b, err := msgpack.Marshal(renamed)
-	if err != nil {
-		return err
-	}
-	return msgpack.Unmarshal(b, v)
 }
